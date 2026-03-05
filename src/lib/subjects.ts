@@ -129,7 +129,7 @@ export const SUBJECTS: Subject[] = [
     ],
   },
   {
-    id: 'history',
+    id: 'hist',
     name: '역사',
     emoji: '📜',
     color: 'amber',

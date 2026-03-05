@@ -17,7 +17,7 @@
   "subject": "string",    // 과목명 (예: "국어", "수학", "영어" 등)
   "topic": "string",      // 세부 탐구 주제
   "length": "string",     // 길이 옵션: "short" | "medium" | "long"
-  "tone": "string"        // 톤 옵션: "formal" | "casual" | "academic"
+  "tone": "string"        // 톤 옵션: "academic" | "friendly" | "neutral"
 }
 ```
 
@@ -26,7 +26,7 @@
 | subject | string | Yes | 8개 과목 중 하나 |
 | topic | string | Yes | 선택한 과목의 세부 주제 |
 | length | string | Yes | "short"(500자), "medium"(1000자), "long"(1500자) |
-| tone | string | Yes | "formal", "casual", "academic" |
+| tone | string | Yes | "academic", "friendly", "neutral" |
 
 ### Response (200)
 
