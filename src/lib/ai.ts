@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getClient() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 const LENGTH_MAP = {
   short: 500,
@@ -46,7 +48,7 @@ export async function generateReport(params: {
   const toneInstruction = TONE_MAP[tone];
   const isScience = isScienceSubject(subject);
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 4096,
     messages: [
@@ -85,7 +87,7 @@ export async function generateSetech(params: {
     ? `\n\n참고할 탐구보고서 내용:\n${reportContent}`
     : '';
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 2048,
     messages: [
