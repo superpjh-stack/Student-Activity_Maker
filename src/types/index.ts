@@ -1,4 +1,18 @@
 export type LengthOption = 'short' | 'medium' | 'long';
+export type Grade = 'grade1' | 'grade2' | 'grade3';
+export type Semester = 'sem1' | 'sem2';
+
+export interface GradeTopic {
+  topic: string;
+  semester: Semester;
+  career: string;
+}
+
+export const GRADE_LABELS: Record<Grade, string> = {
+  grade1: '고1',
+  grade2: '고2',
+  grade3: '고3',
+};
 export type ToneOption = 'academic' | 'friendly' | 'neutral';
 export type StreamingState = 'idle' | 'streaming' | 'done' | 'error';
 export type TeacherStyle = 'analytical' | 'narrative' | 'competency' | 'concise' | 'encouraging';

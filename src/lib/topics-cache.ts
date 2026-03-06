@@ -1,6 +1,7 @@
 // Rule 1: 과목별 추천 주제 일일 캐시 + 새로고침 지원
 // 날짜 시드 기반으로 10개 풀에서 5개를 선택, 하루 동안 localStorage에 캐시
 // 새로고침 버튼 클릭 시 offset 증가 → 다른 5개 선택
+import type { Grade, GradeTopic } from '@/types';
 
 const CACHE_KEY = 'saenggibu_daily_topics';
 const TOPICS_PER_SUBJECT = 5;
@@ -85,6 +86,116 @@ export function getDailyTopics(subjectId: string, allTopics: string[]): string[]
   saveCache(newCache);
   return selected;
 }
+
+// ── 학년별 GradeTopic 캐시 ──────────────────────────────────────────────────
+const CACHE_KEY_GRADE = 'saenggibu_daily_topics_v2';
+
+interface GradeDailyCache {
+  date: string;
+  grade: Grade;
+  subjects: Record<string, { offset: number; topics: GradeTopic[] }>;
+}
+
+function loadGradeCache(): GradeDailyCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_GRADE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.subjects || typeof parsed.subjects !== 'object') {
+      localStorage.removeItem(CACHE_KEY_GRADE);
+      return null;
+    }
+    return parsed as GradeDailyCache;
+  } catch {
+    localStorage.removeItem(CACHE_KEY_GRADE);
+    return null;
+  }
+}
+
+function saveGradeCache(cache: GradeDailyCache): void {
+  localStorage.setItem(CACHE_KEY_GRADE, JSON.stringify(cache));
+}
+
+function selectGradeTopicsByDateSeed(
+  topics: GradeTopic[],
+  subjectId: string,
+  dateStr: string,
+  offset: number
+): GradeTopic[] {
+  const seedStr = `${dateStr}:${subjectId}:${offset}`;
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    seed = (seed * 31 + seedStr.charCodeAt(i)) | 0;
+  }
+
+  const indices = Array.from({ length: topics.length }, (_, i) => i);
+  const selected: number[] = [];
+
+  let s = seed;
+  while (selected.length < TOPICS_PER_SUBJECT && indices.length > 0) {
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s ^= s >>> 16;
+    const idx = Math.abs(s) % indices.length;
+    selected.push(indices.splice(idx, 1)[0]);
+  }
+
+  return selected.map((i) => topics[i]);
+}
+
+export function getDailyTopicsForGrade(
+  subjectId: string,
+  grade: Grade,
+  allTopics: GradeTopic[]
+): GradeTopic[] {
+  const today = getTodayString();
+  const cache = loadGradeCache();
+
+  if (cache && cache.date === today && cache.grade === grade && cache.subjects[subjectId]) {
+    return cache.subjects[subjectId].topics;
+  }
+
+  const selected = selectGradeTopicsByDateSeed(allTopics, subjectId, today, 0);
+  const newCache: GradeDailyCache = {
+    date: today,
+    grade,
+    subjects: {
+      ...(cache?.date === today && cache.grade === grade ? cache.subjects : {}),
+      [subjectId]: { offset: 0, topics: selected },
+    },
+  };
+  saveGradeCache(newCache);
+  return selected;
+}
+
+export function refreshDailyTopicsForGrade(
+  subjectId: string,
+  grade: Grade,
+  allTopics: GradeTopic[]
+): GradeTopic[] {
+  const today = getTodayString();
+  const cache = loadGradeCache();
+
+  const currentOffset =
+    cache?.date === today && cache.grade === grade
+      ? (cache.subjects[subjectId]?.offset ?? 0)
+      : 0;
+  const nextOffset = currentOffset + 1;
+
+  const selected = selectGradeTopicsByDateSeed(allTopics, subjectId, today, nextOffset);
+  const newCache: GradeDailyCache = {
+    date: today,
+    grade,
+    subjects: {
+      ...(cache?.date === today && cache.grade === grade ? cache.subjects : {}),
+      [subjectId]: { offset: nextOffset, topics: selected },
+    },
+  };
+  saveGradeCache(newCache);
+  return selected;
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 // 새로고침: offset 증가 후 새 5개 선택
 export function refreshDailyTopics(subjectId: string, allTopics: string[]): string[] {

@@ -1,16 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import SubjectCard from '@/components/ui/SubjectCard';
 import TopicExpanderSection from '@/components/features/TopicExpanderSection';
 import { SUBJECTS } from '@/lib/subjects';
+import type { Grade } from '@/types';
 
 const STEPS = ['과목 선택', '주제 선택', 'AI 생성'];
+
+const GRADE_OPTIONS: { value: Grade; label: string; desc: string; color: string }[] = [
+  { value: 'grade1', label: '고1', desc: '기초 탐구', color: 'from-sky-400 to-blue-500' },
+  { value: 'grade2', label: '고2', desc: '심화 분석', color: 'from-violet-400 to-indigo-500' },
+  { value: 'grade3', label: '고3', desc: '입시 직결', color: 'from-fuchsia-400 to-pink-500' },
+];
 
 export default function HomePage() {
   const router = useRouter();
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sam_grade') as Grade | null;
+    if (saved) setSelectedGrade(saved);
+  }, []);
+
+  const handleGradeSelect = (grade: Grade) => {
+    setSelectedGrade(grade);
+    localStorage.setItem('sam_grade', grade);
+  };
 
   const handleNext = () => {
     if (selectedSubject) {
@@ -22,7 +40,7 @@ export default function HomePage() {
     <div className="pb-16">
       {/* ── Hero ── */}
       <div className="mb-10 pt-6 text-center">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-1.5 text-xs font-medium text-violet-600">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-pink-200 bg-pink-50 px-4 py-1.5 text-xs font-medium text-pink-500">
           ✨ AI가 세특을 대신 써드려요
         </div>
         <h1 className="text-3xl font-extrabold leading-tight text-slate-900 sm:text-4xl">
@@ -42,7 +60,7 @@ export default function HomePage() {
           <div key={i} className="flex items-center gap-1.5 sm:gap-2">
             <div className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-3 py-1 text-xs font-semibold ${
               i === 0
-                ? 'bg-gradient-to-r from-violet-500 to-pink-500 text-white shadow-md shadow-violet-200'
+                ? 'bg-gradient-to-r from-fuchsia-400 to-pink-300 text-white shadow-md shadow-pink-200'
                 : 'bg-slate-100 text-slate-400'
             }`}>
               <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
@@ -55,6 +73,42 @@ export default function HomePage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* ── Grade selector ── */}
+      <div className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <p className="text-sm font-bold text-slate-700">🎓 학년 선택</p>
+          {selectedGrade && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+              주제가 학년에 맞게 바뀌어요
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {GRADE_OPTIONS.map((g) => (
+            <button
+              key={g.value}
+              onClick={() => handleGradeSelect(g.value)}
+              className={`relative rounded-2xl border-2 p-3 text-center transition-all active:scale-95 ${
+                selectedGrade === g.value
+                  ? 'border-transparent shadow-md'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              {selectedGrade === g.value && (
+                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${g.color} opacity-10`} />
+              )}
+              <p className={`text-lg font-extrabold ${selectedGrade === g.value ? 'text-slate-900' : 'text-slate-600'}`}>
+                {g.label}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-400">{g.desc}</p>
+              {selectedGrade === g.value && (
+                <span className="absolute right-2 top-2 text-xs">✓</span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Subject heading ── */}

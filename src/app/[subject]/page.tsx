@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getSubjectById } from '@/lib/subjects';
-import { getDailyTopics, refreshDailyTopics } from '@/lib/topics-cache';
+import { getDailyTopics, refreshDailyTopics, getDailyTopicsForGrade, refreshDailyTopicsForGrade } from '@/lib/topics-cache';
+import { getGradeTopics } from '@/lib/grade-topics';
 import CoachingModal from '@/components/features/CoachingModal';
+import type { Grade, GradeTopic } from '@/types';
 
 const STEPS = ['과목 선택', '주제 선택', 'AI 생성'];
 
@@ -17,14 +19,25 @@ export default function TopicPage() {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [customTopic, setCustomTopic] = useState('');
   const [dailyTopics, setDailyTopics] = useState<string[]>([]);
+  const [gradeTopics, setGradeTopics] = useState<GradeTopic[]>([]);
+  const [grade, setGrade] = useState<Grade | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showCoaching, setShowCoaching] = useState(false);
   const [pendingTopic, setPendingTopic] = useState<string | null>(null);
 
   useEffect(() => {
-    if (subject) {
-      setDailyTopics(getDailyTopics(subject.id, subject.topics));
+    if (!subject) return;
+    const savedGrade = localStorage.getItem('sam_grade') as Grade | null;
+    setGrade(savedGrade);
+
+    if (savedGrade) {
+      const pool = getGradeTopics(savedGrade, subject.id);
+      if (pool.length > 0) {
+        setGradeTopics(getDailyTopicsForGrade(subject.id, savedGrade, pool));
+        return;
+      }
     }
+    setDailyTopics(getDailyTopics(subject.id, subject.topics));
   }, [subject]);
 
   if (!subject) {
@@ -60,6 +73,14 @@ export default function TopicPage() {
     setRefreshing(true);
     setSelectedTopic(null);
     setTimeout(() => {
+      if (grade) {
+        const pool = getGradeTopics(grade, subject.id);
+        if (pool.length > 0) {
+          setGradeTopics(refreshDailyTopicsForGrade(subject.id, grade, pool));
+          setRefreshing(false);
+          return;
+        }
+      }
       const newTopics = refreshDailyTopics(subject.id, subject.topics);
       setDailyTopics(newTopics);
       setRefreshing(false);
@@ -130,7 +151,14 @@ export default function TopicPage() {
 
       {/* ── Topic list header ── */}
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-700">📚 오늘의 추천 주제</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-slate-700">📚 오늘의 추천 주제</p>
+          {grade && gradeTopics.length > 0 && (
+            <span className="rounded-full bg-gradient-to-r from-violet-500 to-pink-500 px-2 py-0.5 text-[10px] font-bold text-white">
+              {grade === 'grade1' ? '고1' : grade === 'grade2' ? '고2' : '고3'} 맞춤
+            </span>
+          )}
+        </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
@@ -143,30 +171,63 @@ export default function TopicPage() {
 
       {/* ── Topics ── */}
       <div className={`space-y-2.5 transition-opacity duration-300 ${refreshing ? 'opacity-0' : 'opacity-100'}`}>
-        {dailyTopics.map((topic, idx) => (
-          <button
-            key={`${topic}-${idx}`}
-            onClick={() => handleSelectTopic(topic)}
-            className={`card-hover w-full rounded-2xl border-2 p-4 text-left text-sm font-medium transition-all ${
-              selectedTopic === topic && !customTopic.trim()
-                ? 'border-violet-400 bg-gradient-to-r from-violet-50 to-pink-50 shadow-sm shadow-violet-100'
-                : 'glass-card border-transparent hover:border-violet-200'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs transition-all ${
-                selectedTopic === topic && !customTopic.trim()
-                  ? 'border-violet-500 bg-violet-500 text-white'
-                  : 'border-slate-300 text-transparent'
-              }`}>
-                ●
-              </span>
-              <span className={selectedTopic === topic && !customTopic.trim() ? 'text-violet-900' : 'text-slate-700'}>
-                {topic}
-              </span>
-            </div>
-          </button>
-        ))}
+        {gradeTopics.length > 0
+          ? gradeTopics.map((gt, idx) => (
+              <button
+                key={`${gt.topic}-${idx}`}
+                onClick={() => handleSelectTopic(gt.topic)}
+                className={`card-hover w-full rounded-2xl border-2 p-4 text-left text-sm font-medium transition-all ${
+                  selectedTopic === gt.topic && !customTopic.trim()
+                    ? 'border-violet-400 bg-gradient-to-r from-violet-50 to-pink-50 shadow-sm shadow-violet-100'
+                    : 'glass-card border-transparent hover:border-violet-200'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs transition-all ${
+                    selectedTopic === gt.topic && !customTopic.trim()
+                      ? 'border-violet-500 bg-violet-500 text-white'
+                      : 'border-slate-300 text-transparent'
+                  }`}>●</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        gt.semester === 'sem1'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-violet-100 text-violet-700'
+                      }`}>
+                        {gt.semester === 'sem1' ? '1학기' : '2학기'}
+                      </span>
+                      <span className="truncate text-xs text-slate-400">{gt.career}</span>
+                    </div>
+                    <span className={selectedTopic === gt.topic && !customTopic.trim() ? 'text-violet-900' : 'text-slate-700'}>
+                      {gt.topic}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))
+          : dailyTopics.map((topic, idx) => (
+              <button
+                key={`${topic}-${idx}`}
+                onClick={() => handleSelectTopic(topic)}
+                className={`card-hover w-full rounded-2xl border-2 p-4 text-left text-sm font-medium transition-all ${
+                  selectedTopic === topic && !customTopic.trim()
+                    ? 'border-violet-400 bg-gradient-to-r from-violet-50 to-pink-50 shadow-sm shadow-violet-100'
+                    : 'glass-card border-transparent hover:border-violet-200'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs transition-all ${
+                    selectedTopic === topic && !customTopic.trim()
+                      ? 'border-violet-500 bg-violet-500 text-white'
+                      : 'border-slate-300 text-transparent'
+                  }`}>●</span>
+                  <span className={selectedTopic === topic && !customTopic.trim() ? 'text-violet-900' : 'text-slate-700'}>
+                    {topic}
+                  </span>
+                </div>
+              </button>
+            ))}
       </div>
 
       {/* ── Custom input ── */}
