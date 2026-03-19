@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BatchSubjectSelector from '@/components/features/BatchSubjectSelector';
-import type { LengthOption, ToneOption, TeacherStyle } from '@/types';
+import SourceList from '@/components/features/SourceList';
+import type { LengthOption, ToneOption, TeacherStyle, SourceItem } from '@/types';
 import type { BatchItem } from '@/components/features/BatchSubjectSelector';
 
 interface BatchResult {
@@ -43,6 +44,8 @@ export default function BatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<BatchResult[]>([]);
   const [activeTab, setActiveTab] = useState(0);
+  const [sourcesMap, setSourcesMap] = useState<Record<number, SourceItem[]>>({});
+  const [sourcesLoadingSet, setSourcesLoadingSet] = useState<Set<number>>(new Set());
 
   const canGenerate = items.length > 0 && items.every((item) => item.topic.trim().length > 0);
 
@@ -75,6 +78,25 @@ export default function BatchPage() {
       const data = await res.json();
       setResults(data.results);
       setActiveTab(0);
+      setSourcesMap({});
+
+      // 각 결과에 대해 참고문헌 병렬 생성
+      data.results.forEach((r: BatchResult, i: number) => {
+        setSourcesLoadingSet((prev) => new Set(prev).add(i));
+        fetch('/api/generate-sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: r.subjectName, topic: r.topic }),
+        })
+          .then((res) => res.ok ? res.json() : { sources: [] })
+          .then((data: { sources: SourceItem[] }) => {
+            setSourcesMap((prev) => ({ ...prev, [i]: data.sources ?? [] }));
+          })
+          .catch(() => { /* 출처 실패 무시 */ })
+          .finally(() => {
+            setSourcesLoadingSet((prev) => { const s = new Set(prev); s.delete(i); return s; });
+          });
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '생성 중 오류가 발생했습니다.');
     } finally {
@@ -216,6 +238,16 @@ export default function BatchPage() {
                   {results[activeTab].setech}
                 </p>
               </div>
+
+              {/* Sources */}
+              {(sourcesLoadingSet.has(activeTab) || sourcesMap[activeTab]?.length > 0) && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <SourceList
+                    sources={sourcesMap[activeTab] ?? []}
+                    loading={sourcesLoadingSet.has(activeTab)}
+                  />
+                </div>
+              )}
             </div>
           )}
 
