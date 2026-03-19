@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { LengthOption, ToneOption, TeacherStyle, UserProfile, AbGenerateResponse } from '@/types';
+import type { LengthOption, ToneOption, TeacherStyle, UserProfile, AbGenerateResponse, SourceItem } from '@/types';
 
 function getClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -393,4 +393,54 @@ ${teacherStyleContext}
   });
 
   return response.choices[0]?.message?.content ?? '';
+}
+
+export async function generateSources(params: {
+  subject: string;
+  topic: string;
+}): Promise<SourceItem[]> {
+  const { subject, topic } = params;
+
+  const response = await getClient().chat.completions.create({
+    model: 'gpt-4o',
+    max_tokens: 1024,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: `당신은 한국 고등학생의 탐구보고서를 위한 참고문헌 목록을 생성하는 AI입니다.
+
+다음 탐구 주제와 관련하여 참고할 수 있는 학술 자료 4개를 JSON 형식으로 반환해주세요.
+
+- 과목: ${subject}
+- 탐구 주제: ${topic}
+
+반환 형식 (반드시 이 JSON 구조만 반환):
+{
+  "sources": [
+    {
+      "title": "논문 또는 자료 제목 (한국어)",
+      "author": "저자명 또는 기관명",
+      "year": "발행연도 (예: 2022)",
+      "keyword": "검색에 사용할 핵심 키워드 (한국어, 공백 포함 가능)"
+    }
+  ]
+}
+
+조건:
+- 탐구 주제와 직접 관련된 실제로 존재할 법한 학술 자료를 추천
+- 고등학생 수준에서 접근 가능한 자료 위주
+- keyword는 RISS/Google Scholar 검색에 적합한 2~4어절 이내
+- 연도는 2015~2024년 범위 내`,
+      },
+    ],
+  });
+
+  try {
+    const content = response.choices[0]?.message?.content ?? '{}';
+    const parsed = JSON.parse(content) as { sources?: SourceItem[] };
+    return parsed.sources ?? [];
+  } catch {
+    return [];
+  }
 }

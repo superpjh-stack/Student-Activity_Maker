@@ -9,8 +9,9 @@ import { loadProfile, saveProfile } from '@/lib/profile';
 import ResultDisplay from '@/components/features/ResultDisplay';
 import AbCompareView from '@/components/features/AbCompareView';
 import ProfileSetupModal from '@/components/features/ProfileSetupModal';
-import type { LengthOption, ToneOption, TeacherStyle, HistoryItem, StreamingState, UserProfile, AbGenerateResponse } from '@/types';
+import type { LengthOption, ToneOption, TeacherStyle, HistoryItem, StreamingState, UserProfile, AbGenerateResponse, SourceItem } from '@/types';
 import { TEACHER_STYLE_LABELS } from '@/types';
+import SourceList from '@/components/features/SourceList';
 
 const TONE_LABEL: Record<string, string> = {
   academic: '학술적',
@@ -152,6 +153,9 @@ function GeneratePageContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
+  const [sources, setSources] = useState<SourceItem[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+
   useEffect(() => {
     setProfile(loadProfile());
   }, []);
@@ -190,6 +194,8 @@ function GeneratePageContent() {
     setReport('');
     setSetech('');
     setAbResult(null);
+    setSources([]);
+    setSourcesLoading(false);
     setReportStreamState('streaming');
     setSetechStreamState('idle');
 
@@ -216,6 +222,22 @@ function GeneratePageContent() {
       });
       setSetechStreamState('done');
       persistHistory(finalReport, finalSetech);
+
+      // 참고문헌 생성 (백그라운드)
+      setSourcesLoading(true);
+      try {
+        const res = await fetch('/api/generate-sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: subject.name, topic }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { sources: SourceItem[] };
+          setSources(data.sources ?? []);
+        }
+      } catch { /* 출처 실패는 무시 */ } finally {
+        setSourcesLoading(false);
+      }
     } catch {
       setSetechStreamState('error');
       setError('세특 생성 중 오류가 발생했습니다.');
@@ -469,6 +491,12 @@ function GeneratePageContent() {
             versionB={abResult.versionB}
             onSelect={handleAbSelect}
           />
+        )}
+
+        {(sourcesLoading || sources.length > 0) && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+            <SourceList sources={sources} loading={sourcesLoading} />
+          </div>
         )}
       </div>
 

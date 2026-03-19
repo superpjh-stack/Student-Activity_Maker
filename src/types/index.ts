@@ -75,6 +75,13 @@ export interface GenerateSetechResponse {
   wordCount: number;
 }
 
+export interface SourceItem {
+  title: string;
+  author?: string;
+  year?: string;
+  keyword: string;
+}
+
 export interface HistoryItem {
   id: string;
   createdAt: string;
